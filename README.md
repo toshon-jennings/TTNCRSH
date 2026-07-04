@@ -67,4 +67,4 @@ TTNCRSH includes a client-side **Grounded AI Safety Assistant** (accessible via 
 
 ### Setup
 
-Click the **Gear** icon in the chat header to input your API key (Gemini, OpenAI, Anthropic, Groq, Grok, or OpenRouter). API keys are stored locally in the browser's `localStorage` and sent directly to the vendor's API endpoint.
+Click the **Gear** icon in the chat header to input your API key (Gemini, OpenAI, Anthropic, Groq, Grok, or OpenRouter). API keys are encrypted and stored locally (unlocked using PIN) in the browser's `localStorage` and sent directly to the vendor's API endpoint.
