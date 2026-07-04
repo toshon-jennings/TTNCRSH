@@ -2204,3 +2204,96 @@ input.outlier-slider {
   color: var(--color-text-strong);
 }
 
+/* AI assistant security lock screen */
+.ai-lock-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 24px;
+  height: 100%;
+  text-align: center;
+  color: var(--color-text-strong);
+  background: var(--color-panel-bg);
+}
+
+.ai-lock-icon {
+  color: var(--color-accent);
+  margin-bottom: 16px;
+}
+
+.ai-lock-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ai-lock-desc {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-bottom: 20px;
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+.ai-pin-input {
+  width: 160px;
+  padding: 10px;
+  border: 1px solid var(--border-panel-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-status-bg);
+  color: var(--color-text-strong);
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  outline: none;
+  margin-bottom: 12px;
+  transition: border-color var(--transition-fast);
+}
+
+.ai-pin-input:focus {
+  border-color: var(--color-accent);
+}
+
+.ai-unlock-btn {
+  width: 160px;
+  padding: 8px 16px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ai-unlock-btn:hover {
+  background: var(--color-accent-hover);
+}
+
+.ai-unlock-error {
+  color: var(--color-error);
+  font-size: 11px;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+/* Security warning badge in settings toggle */
+.ai-panel-action-btn.warning {
+  position: relative;
+}
+
+.ai-panel-action-btn.warning::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-error);
+  border: 1.5px solid var(--color-panel-bg);
+}
+

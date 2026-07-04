@@ -2,6 +2,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { query } from './db';
 import { highlightAndZoomToSegments } from './map';
+import { encryptKey, decryptKey } from './security';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -409,10 +410,15 @@ export function initAIAssistant() {
   chatPanel.id = 'ai-chat-panel';
   chatPanel.className = 'ai-chat-panel is-collapsed';
   chatPanel.setAttribute('aria-hidden', 'true');
+  
+  const isTrentonApp = window.location.pathname.toLowerCase().includes('trenton') || window.location.pathname.toLowerCase().includes('ttncrsh');
+  const appPrefix = isTrentonApp ? 'ttncrsh_' : 'phlcrsh_';
+  const logoPath = isTrentonApp ? '/TTNCRSH/favicon.png' : '/PHLCRSH-V2/favicon.png';
+
   chatPanel.innerHTML = `
     <div class="ai-panel-header">
       <div class="ai-panel-title-area">
-        <img src="/PHLCRSH-V2/favicon.png" class="ai-title-icon" width="16" height="16" alt="Safety Icon">
+        <img src="${logoPath}" class="ai-title-icon" width="16" height="16" alt="Safety Icon">
         <span class="ai-panel-title">Safety Assistant</span>
       </div>
       <div class="ai-panel-actions">
@@ -462,19 +468,15 @@ export function initAIAssistant() {
         <label for="ai-api-key">API Key</label>
         <input type="password" id="ai-api-key" placeholder="Enter API key...">
       </div>
+      <div class="ai-settings-field" id="ai-pin-field" style="display: none;">
+        <label for="ai-pin">4-Digit Security PIN</label>
+        <input type="password" id="ai-pin" placeholder="Enter 4-digit PIN..." maxlength="4" pattern="[0-9]*" inputmode="numeric">
+        <div class="ai-settings-alert" style="display: block; margin-top: 4px; color: var(--color-muted); font-size: 9.5px;">Required to encrypt and store your key in localStorage.</div>
+      </div>
       <button id="ai-settings-save" class="ai-settings-save-btn">Save & Close</button>
     </div>
 
     <div id="ai-chat-messages" class="ai-chat-messages">
-      <div class="ai-message assistant-message">
-        Hi! I'm your TTNCRSH Safety Assistant. Ask me a safety query (e.g., "Find the top 5 highest risk streets with no bike lanes in South Trenton") and I will query the local DuckDB database and summarize the insights.
-      </div>
-      <div id="ai-starter-chips" class="ai-starter-chips">
-        <button type="button" class="ai-starter-chip">Top 10 riskiest streets citywide</button>
-        <button type="button" class="ai-starter-chip">High-risk streets with no bike lanes in South Trenton</button>
-        <button type="button" class="ai-starter-chip">Most 311 street defects near schools</button>
-        <button type="button" class="ai-starter-chip">Streets with fatal crashes and no traffic signal</button>
-      </div>
     </div>
 
     <form id="ai-chat-form" class="ai-chat-input-area">
@@ -505,21 +507,26 @@ export function initAIAssistant() {
   const providerSelect = document.getElementById('ai-provider') as HTMLSelectElement;
   const modelInput = document.getElementById('ai-model') as HTMLInputElement;
   const apiKeyInput = document.getElementById('ai-api-key') as HTMLInputElement;
+  const pinField = document.getElementById('ai-pin-field') as HTMLDivElement;
+  const pinInput = document.getElementById('ai-pin') as HTMLInputElement;
   const providerNote = document.getElementById('ai-provider-note') as HTMLDivElement;
   const baseUrlField = document.getElementById('ai-base-url-field') as HTMLDivElement;
   const baseUrlInput = document.getElementById('ai-base-url') as HTMLInputElement;
 
+  // Dynamic scoping based on path
+  const PREFIX = `${appPrefix}ai_`;
+
   // Load Settings from LocalStorage
-  let currentProvider = localStorage.getItem('phlcrsh_ai_provider') || 'gemini';
-  let currentModel = localStorage.getItem('phlcrsh_ai_model') || DEFAULT_MODELS[currentProvider];
-  let currentApiKey = localStorage.getItem(`phlcrsh_ai_key_${currentProvider}`) || '';
-  let currentBaseUrl = localStorage.getItem('phlcrsh_ai_base_url') || '';
+  let currentProvider = localStorage.getItem(`${PREFIX}provider`) || 'gemini';
+  let currentModel = localStorage.getItem(`${PREFIX}model`) || DEFAULT_MODELS[currentProvider];
+  let currentBaseUrl = localStorage.getItem(`${PREFIX}base_url`) || '';
+  let currentApiKey = ''; // Loaded dynamically on unlock
 
   // Initialize form fields
   providerSelect.value = currentProvider;
   modelInput.value = currentModel;
-  apiKeyInput.value = currentApiKey;
   baseUrlInput.value = currentBaseUrl;
+  pinField.style.display = currentProvider === 'custom' ? 'none' : 'block';
   baseUrlField.style.display = currentProvider === 'custom' ? 'flex' : 'none';
 
   const updateProviderNote = (provider: string) => {
@@ -546,15 +553,30 @@ export function initAIAssistant() {
     const isHidden = settingsPane.classList.contains('is-hidden');
     if (isHidden) {
       // Refresh inputs
-      currentProvider = localStorage.getItem('phlcrsh_ai_provider') || 'gemini';
-      currentModel = localStorage.getItem('phlcrsh_ai_model') || DEFAULT_MODELS[currentProvider];
-      currentApiKey = localStorage.getItem(`phlcrsh_ai_key_${currentProvider}`) || '';
-      currentBaseUrl = localStorage.getItem('phlcrsh_ai_base_url') || '';
+      currentProvider = localStorage.getItem(`${PREFIX}provider`) || 'gemini';
+      currentModel = localStorage.getItem(`${PREFIX}model`) || DEFAULT_MODELS[currentProvider];
+      currentBaseUrl = localStorage.getItem(`${PREFIX}base_url`) || '';
 
       providerSelect.value = currentProvider;
       modelInput.value = currentModel;
-      apiKeyInput.value = currentApiKey;
       baseUrlInput.value = currentBaseUrl;
+      pinField.style.display = currentProvider === 'custom' ? 'none' : 'block';
+
+      // Clear input values
+      const rawKey = localStorage.getItem(`${PREFIX}key_${currentProvider}`);
+      const encKey = localStorage.getItem(`${PREFIX}key_${currentProvider}_enc`);
+      if (rawKey) {
+        apiKeyInput.value = rawKey;
+        apiKeyInput.placeholder = "Enter API key...";
+      } else if (encKey) {
+        apiKeyInput.value = '';
+        apiKeyInput.placeholder = "[Encrypted Key Saved]";
+      } else {
+        apiKeyInput.value = '';
+        apiKeyInput.placeholder = "Enter API key...";
+      }
+      pinInput.value = '';
+
       baseUrlField.style.display = currentProvider === 'custom' ? 'flex' : 'none';
       updateProviderNote(currentProvider);
 
@@ -572,23 +594,56 @@ export function initAIAssistant() {
   providerSelect.addEventListener('change', () => {
     const prov = providerSelect.value;
     modelInput.value = DEFAULT_MODELS[prov] || '';
-    apiKeyInput.value = localStorage.getItem(`phlcrsh_ai_key_${prov}`) || '';
-    baseUrlInput.value = localStorage.getItem('phlcrsh_ai_base_url') || '';
+    pinField.style.display = prov === 'custom' ? 'none' : 'block';
+
+    const rawKey = localStorage.getItem(`${PREFIX}key_${prov}`);
+    const encKey = localStorage.getItem(`${PREFIX}key_${prov}_enc`);
+    if (rawKey) {
+      apiKeyInput.value = rawKey;
+      apiKeyInput.placeholder = "Enter API key...";
+    } else if (encKey) {
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = "[Encrypted Key Saved]";
+    } else {
+      apiKeyInput.value = '';
+      apiKeyInput.placeholder = "Enter API key...";
+    }
+    pinInput.value = '';
+
+    baseUrlInput.value = localStorage.getItem(`${PREFIX}base_url`) || '';
     baseUrlField.style.display = prov === 'custom' ? 'flex' : 'none';
     updateProviderNote(prov);
   });
 
   // Save Settings
-  settingsSaveBtn.addEventListener('click', () => {
+  settingsSaveBtn.addEventListener('click', async () => {
     const prov = providerSelect.value;
     const model = modelInput.value.trim();
     const key = apiKeyInput.value.trim();
     const baseUrl = baseUrlInput.value.trim();
+    const pin = pinInput.value.trim();
 
-    localStorage.setItem('phlcrsh_ai_provider', prov);
-    localStorage.setItem('phlcrsh_ai_model', model);
-    localStorage.setItem(`phlcrsh_ai_key_${prov}`, key);
-    localStorage.setItem('phlcrsh_ai_base_url', baseUrl);
+    if (key && prov !== 'custom') {
+      if (pin.length !== 4 || !/^\d+$/.test(pin)) {
+        alert('Please enter a 4-digit numeric PIN to encrypt your API key.');
+        return;
+      }
+      try {
+        const encrypted = await encryptKey(key, pin);
+        localStorage.setItem(`${PREFIX}key_${prov}_enc`, encrypted);
+        localStorage.removeItem(`${PREFIX}key_${prov}`); // Remove raw key if any
+      } catch (err) {
+        alert('Encryption failed. Please try again.');
+        return;
+      }
+    } else if (!key && apiKeyInput.placeholder !== "[Encrypted Key Saved]") {
+      localStorage.removeItem(`${PREFIX}key_${prov}_enc`);
+      localStorage.removeItem(`${PREFIX}key_${prov}`);
+    }
+
+    localStorage.setItem(`${PREFIX}provider`, prov);
+    localStorage.setItem(`${PREFIX}model`, model);
+    localStorage.setItem(`${PREFIX}base_url`, baseUrl);
 
     currentProvider = prov;
     currentModel = model;
@@ -596,6 +651,7 @@ export function initAIAssistant() {
     currentBaseUrl = baseUrl;
 
     toggleSettings();
+    checkLockState();
   });
 
   // Toggle Chat Panel visibility
@@ -732,7 +788,7 @@ export function initAIAssistant() {
   };
 
   // Persisted chat history (localStorage), capped at the last 50 messages
-  const HISTORY_KEY = 'phlcrsh_ai_history';
+  const HISTORY_KEY = `${PREFIX}history`;
   let chatHistory: Message[] = [];
   try {
     const saved = localStorage.getItem(HISTORY_KEY);
@@ -779,34 +835,134 @@ export function initAIAssistant() {
     };
   };
 
-  // Starter chips — clicking one fills the input and submits, then hides the chips for the session
-  const starterChipsEl = document.getElementById('ai-starter-chips') as HTMLDivElement;
-  starterChipsEl?.querySelectorAll<HTMLButtonElement>('.ai-starter-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      chatInput.value = chip.textContent || '';
-      starterChipsEl.remove();
-      chatForm.requestSubmit();
-    });
-  });
+  // Lock State checker & renderer
+  const renderMessages = () => {
+    const isTrenton = PREFIX.startsWith('ttncrsh');
+    const titleName = isTrenton ? 'TTNCRSH' : 'PHLCRSH';
+    const regionName = isTrenton ? 'South Trenton' : 'South Philly';
+    
+    messagesContainer.innerHTML = `
+      <div class="ai-message assistant-message">
+        Hi! I'm your ${titleName} Safety Assistant. Ask me a safety query (e.g., "Find the top 5 highest risk streets with no bike lanes in ${regionName}") and I will query the local DuckDB database and summarize the insights.
+      </div>
+      <div id="ai-starter-chips" class="ai-starter-chips">
+        <button type="button" class="ai-starter-chip">Top 10 riskiest streets citywide</button>
+        <button type="button" class="ai-starter-chip">High-risk streets with no bike lanes in ${regionName}</button>
+        <button type="button" class="ai-starter-chip">Most 311 street defects near schools</button>
+        <button type="button" class="ai-starter-chip">Streets with fatal crashes and no traffic signal</button>
+      </div>
+    `;
 
-  // Restore persisted messages after the welcome bubble. Rendered via appendMessage,
-  // which never triggers a map zoom on its own (only a manual "Flash & Zoom" click does),
-  // so restoring history cannot auto-trigger the map.
-  if (chatHistory.length > 0) {
-    chatHistory.forEach((msg) => appendMessage(msg));
-    starterChipsEl?.remove();
-  }
+    // Wire up starter chips
+    const starterChipsEl = document.getElementById('ai-starter-chips') as HTMLDivElement;
+    starterChipsEl?.querySelectorAll<HTMLButtonElement>('.ai-starter-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        chatInput.value = chip.textContent || '';
+        starterChipsEl.remove();
+        chatForm.requestSubmit();
+      });
+    });
+
+    // Restore persisted messages after the welcome bubble
+    if (chatHistory.length > 0) {
+      chatHistory.forEach((msg) => appendMessage(msg));
+      starterChipsEl?.remove();
+    }
+
+    scrollToBottom();
+  };
+
+  const checkLockState = () => {
+    const encryptedKey = localStorage.getItem(`${PREFIX}key_${currentProvider}_enc`);
+    const rawKey = localStorage.getItem(`${PREFIX}key_${currentProvider}`);
+    
+    settingsToggle.classList.remove('warning');
+    settingsToggle.removeAttribute('title');
+
+    if (encryptedKey) {
+      // Locked state
+      chatInput.disabled = true;
+      chatSendBtn.disabled = true;
+      chatInput.placeholder = "Please unlock the assistant...";
+
+      messagesContainer.innerHTML = `
+        <div class="ai-lock-screen">
+          <svg class="ai-lock-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <div class="ai-lock-title">Assistant is Locked</div>
+          <div class="ai-lock-desc">Your API key is encrypted. Enter your 4-digit PIN to unlock.</div>
+          <input type="password" id="ai-unlock-pin" class="ai-pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="••••" autofocus>
+          <button id="ai-unlock-btn" class="ai-unlock-btn">Unlock</button>
+          <div id="ai-unlock-error" class="ai-unlock-error" style="display: none;"></div>
+        </div>
+      `;
+
+      const unlockPin = document.getElementById('ai-unlock-pin') as HTMLInputElement;
+      const unlockBtn = document.getElementById('ai-unlock-btn') as HTMLButtonElement;
+      const unlockError = document.getElementById('ai-unlock-error') as HTMLDivElement;
+
+      const attemptUnlock = async () => {
+        const pin = unlockPin.value.trim();
+        if (pin.length !== 4) {
+          unlockError.textContent = "PIN must be 4 digits.";
+          unlockError.style.display = 'block';
+          return;
+        }
+        unlockBtn.disabled = true;
+        unlockBtn.textContent = "Decrypting...";
+        try {
+          const dec = await decryptKey(encryptedKey, pin);
+          currentApiKey = dec;
+          
+          chatInput.disabled = false;
+          chatSendBtn.disabled = false;
+          chatInput.placeholder = "Ask about safety...";
+          
+          renderMessages();
+        } catch (err) {
+          unlockBtn.disabled = false;
+          unlockBtn.textContent = "Unlock";
+          unlockError.textContent = "Incorrect PIN. Try again.";
+          unlockError.style.display = 'block';
+          unlockPin.value = '';
+          unlockPin.focus();
+        }
+      };
+
+      unlockBtn.addEventListener('click', attemptUnlock);
+      unlockPin.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') attemptUnlock();
+      });
+      unlockPin.focus();
+    } else {
+      // Unlocked state (either custom, no key, or legacy unencrypted key)
+      chatInput.disabled = false;
+      chatSendBtn.disabled = false;
+      chatInput.placeholder = "Ask about safety...";
+
+      if (rawKey && currentProvider !== 'custom') {
+        currentApiKey = rawKey;
+        settingsToggle.classList.add('warning');
+        settingsToggle.setAttribute('title', 'Security Warning: API key is stored unencrypted in localStorage. Open settings and set a PIN.');
+      } else {
+        currentApiKey = '';
+      }
+
+      renderMessages();
+    }
+  };
 
   // Clear chat history and reset the panel back to just the welcome bubble
   clearChatBtn.addEventListener('click', () => {
     chatHistory = [];
     saveHistory();
-    messagesContainer.innerHTML = `
-      <div class="ai-message assistant-message">
-        Hi! I'm your TTNCRSH Safety Assistant. Ask me a safety query (e.g., "Find the top 5 highest risk streets with no bike lanes in South Trenton") and I will query the local DuckDB database and summarize the insights.
-      </div>
-    `;
+    renderMessages();
   });
+
+  // Initial check on load
+  checkLockState();
 
   // Submit Handler
   chatForm.addEventListener('submit', async (e) => {
