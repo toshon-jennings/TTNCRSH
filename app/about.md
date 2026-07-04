@@ -22,7 +22,8 @@ The Trenton Engine aggregates official, geocoded accident records from the New J
 
 ## Credits & Contributions
 
-- **TTNCRSH Engine**: Created and developed by [Toshon Jennings](https://github.com/toschon-jennings) and **Antigravity** (Google DeepMind's AI coding assistant). This system is designed as a federated extension of the safety portal concept.
+- **Original Application**: Created and developed by [Ben Polinsky](https://github.com/ben-polinsky) as an exploratory analysis tool linking spatial geometry and PennDOT crashes. View the original [PHLCRSH GitHub repository](https://github.com/benpolinsky/PHLCRSH) or the [live map](https://benpolinsky.github.io/PHLCRSH/).
+- **TTNCRSH Engine**: Created and developed by [Toshon Jennings](https://github.com/toschon-jennings) and **Antigravity** (Google DeepMind's AI coding assistant). This system is designed as a federated extension of the safety portal concept built on top of Ben's original layout and visualization system.
 
 ## Data Sources
 
