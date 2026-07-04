@@ -7,8 +7,8 @@
     <link rel="icon" type="image/png" href="/TTNCRSH/favicon.png">
     <link rel="apple-touch-icon" href="/TTNCRSH/apple-touch-icon.png">
     <title>TTNCRSH — Trenton Crash Risk</title>
-    <script type="module" crossorigin src="/TTNCRSH/assets/main-DUNBgqA5.js"></script>
-    <link rel="stylesheet" crossorigin href="/TTNCRSH/assets/main-T1oA_01W.css">
+    <script type="module" crossorigin src="/TTNCRSH/assets/main-CtPAFvtF.js"></script>
+    <link rel="stylesheet" crossorigin href="/TTNCRSH/assets/main-BVGCbg3r.css">
   </head>
   <body>
     <div id="app">
@@ -160,10 +160,11 @@
                 <div class="layer-row">
                   <div class="layer-swatch swatch-bike-lanes" style="background: #10b981;"></div>
                   <div class="layer-label">Bike Lanes<span>Protected / Painted / Sharrow</span></div>
-                  <label class="toggle">
+                  <label class="toggle" title="Re-run data pipeline to populate bike lane data from OSM">
                     <input type="checkbox" id="toggle-bike-lanes">
                     <div class="toggle-track"></div>
                   </label>
+                  <span class="layer-no-data" title="Bike lane data not yet populated — re-run gather_city.py">no data</span>
                 </div>
                 <div class="legend-area" id="legend-bike-lanes"></div>
                 <div class="layer-row">
@@ -178,10 +179,11 @@
                 <div class="layer-row">
                   <div class="layer-swatch swatch-roadway-defects" style="background: #f97316;"></div>
                   <div class="layer-label">Street Defects<span>311 reports since 2020</span></div>
-                  <label class="toggle">
+                  <label class="toggle" title="Trenton 311 data not yet integrated">
                     <input type="checkbox" id="toggle-roadway-defects">
                     <div class="toggle-track"></div>
                   </label>
+                  <span class="layer-no-data" title="311 data not yet integrated">no data</span>
                 </div>
                 <div class="legend-area" id="legend-roadway-defects"></div>
               </div>
@@ -256,19 +258,21 @@
                 <div class="layer-row">
                   <div class="layer-swatch swatch-heat" style="background: #f97316;"></div>
                   <div class="layer-label">Urban Heat Index<span>Heat vulnerability</span></div>
-                  <label class="toggle">
+                  <label class="toggle" title="Heat vulnerability data not yet integrated">
                     <input type="checkbox" id="toggle-heat">
                     <div class="toggle-track"></div>
                   </label>
+                  <span class="layer-no-data" title="Requires NJ Urban Heat Island raster — not yet integrated">no data</span>
                 </div>
                 <div class="legend-area" id="legend-heat"></div>
                 <div class="layer-row">
                   <div class="layer-swatch swatch-school-zones" style="background: #8b5cf6;"></div>
                   <div class="layer-label">School Zones<span>Risk around schools</span></div>
-                  <label class="toggle">
+                  <label class="toggle" title="Re-run data pipeline to populate school zone data from OSM">
                     <input type="checkbox" id="toggle-school-zones">
                     <div class="toggle-track"></div>
                   </label>
+                  <span class="layer-no-data" title="School zone data not yet populated — re-run gather_city.py">no data</span>
                 </div>
                 <div class="legend-area" id="legend-school-zones"></div>
               </div>
