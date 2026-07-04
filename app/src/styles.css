@@ -1063,6 +1063,20 @@ input.outlier-slider {
   font-size: var(--text-control);
 }
 
+.layer-no-data {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: rgba(var(--color-white-rgb), 0.06);
+  border: 1px solid rgba(var(--color-white-rgb), 0.1);
+  color: var(--color-muted);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: help;
+}
+
 /* Toggle switch */
 .toggle {
   position: relative;

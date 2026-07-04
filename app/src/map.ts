@@ -280,21 +280,22 @@ export async function initMap(container: string) {
       colName = `crash_count_${time}_${weather}`;
     }
 
-    const riskIndexExpr = [
+    // Crash density for the selected temporal/weather slice (crashes per 1,000 ft)
+    const densityExpr: any = [
       'case',
-      ['all', ['>', ['coalesce', ['get', 'adt'], 0], 0], ['>', ['coalesce', ['get', 'length'], 0], 0]],
-      ['/', ['*', ['coalesce', ['get', colName], 0], 1000000.0], ['*', ['get', 'adt'], ['get', 'length']]],
-      0.0
+      ['>', ['coalesce', ['get', 'length'], 0], 0],
+      ['/', ['*', ['coalesce', ['get', colName], 0], 1000.0], ['get', 'length']],
+      0.0,
     ];
 
     map.setPaintProperty('segments-line', 'line-color', [
-      'step', riskIndexExpr as any,
+      'step', densityExpr,
       '#ffffff',
-      0.1, '#fee5d9',
-      0.5, '#fcae91',
-      2.0, '#fb6a4a',
-      10.0, '#de2d26',
-      50.0, '#a50f15',
+      1, '#fee5d9',
+      3, '#fcae91',
+      8, '#fb6a4a',
+      20, '#de2d26',
+      50, '#a50f15',
     ] as any);
 
     // Update leaderboard when filters change!

@@ -115,8 +115,13 @@ def get_trenton_street_network():
     # Get boundary polygon for Trenton, NJ
     trenton_boundary = ox.geocode_to_gdf("Trenton, New Jersey")
     
-    # Download drive network within Trenton
-    graph = ox.graph_from_place("Trenton, New Jersey", network_type="drive")
+    # Download drive network within Trenton; retain extra OSM way tags so we can
+    # read cycleway, bicycle, and other infrastructure attributes.
+    ox.settings.useful_tags_way = list(set(ox.settings.useful_tags_way + [
+        "cycleway", "cycleway:both", "cycleway:left", "cycleway:right",
+        "bicycle", "foot", "access",
+    ]))
+    graph = ox.graph_from_place("Trenton, New Jersey", network_type="drive", retain_all=False)
     edges = ox.graph_to_gdfs(graph, nodes=False, edges=True)
     
     # Reproject to New Jersey State Plane Feet (EPSG:3424) for length calculations
@@ -401,15 +406,58 @@ def run_pipeline():
     edges["adt"] = None
     edges["vmt"] = None
     edges["risk_index"] = 0.0 # Will be recalculated in browser view or python
-    edges["bike_infra_type"] = "None"
+    # Bike infrastructure: classify from OSM cycleway tags
+    def classify_bike_infra(row):
+        for tag in ("cycleway", "cycleway:both", "cycleway:left", "cycleway:right"):
+            val = row.get(tag)
+            if isinstance(val, list):
+                val = val[0]
+            if not val or val == "no":
+                continue
+            val = str(val).lower()
+            if val in ("track", "sidepath", "crossing", "buffered_lane"):
+                return "Protected"
+            if val in ("lane", "opposite_lane", "advisory"):
+                return "Painted"
+            if val in ("shared_lane", "sharrow", "shared", "shoulder"):
+                return "Sharrow"
+        return "None"
+
+    edges["bike_infra_type"] = edges.apply(classify_bike_infra, axis=1)
+    print(f"  Bike infra breakdown: {edges['bike_infra_type'].value_counts().to_dict()}")
+
     edges["nighttime_illumination"] = 0.0
     edges["crash_count_day_clear"] = edges["crash_count_day"] # Simplified
     edges["crash_count_day_wet"] = 0
     edges["crash_count_night_clear"] = edges["crash_count_night"]
     edges["crash_count_night_wet"] = 0
     edges["is_glare_prone"] = 0
-    edges["is_school_zone"] = 0
+
+    # School zones: flag segments within 500 ft of a school/university OSM node
+    try:
+        school_tags = {"amenity": ["school", "university", "college", "kindergarten"]}
+        schools_gdf = ox.features_from_place("Trenton, New Jersey", tags=school_tags)
+        if not schools_gdf.empty:
+            schools_3424 = schools_gdf.to_crs(3424)
+            # Use centroid for non-point geometries
+            school_points = schools_3424.geometry.centroid
+            school_buf = school_points.buffer(500)  # 500 ft radius
+            edges["is_school_zone"] = edges.apply(
+                lambda r: 1 if school_buf.intersects(r.geometry).any() else 0,
+                axis=1
+            )
+            n_school_zones = edges["is_school_zone"].sum()
+            print(f"  School zones: {n_school_zones} segments within 500 ft of a school")
+        else:
+            edges["is_school_zone"] = 0
+            print("  No schools found in OSM for Trenton — is_school_zone set to 0")
+    except Exception as e:
+        print(f"  School zone extraction failed: {e} — defaulting to 0")
+        edges["is_school_zone"] = 0
+
+    # TODO: high_heat_vulnerability — requires NJ Urban Heat Island or EPA EJScreen raster
     edges["high_heat_vulnerability"] = 0
+    # TODO: roadway_defect/paving/request counts — requires Trenton 311 open data API
     edges["roadway_request_count"] = 0
     edges["roadway_defect_count"] = 0
     edges["roadway_paving_request_count"] = 0
