@@ -1,4 +1,5 @@
 import os
+import json
 import zipfile
 import csv
 import io
@@ -395,7 +396,7 @@ def run_pipeline():
     edges["has_aadt"] = 0
     edges["state_aadt"] = None
     edges["adt_source"] = "None"
-    edges["canopy_pct"] = 15.0
+    edges["canopy_pct"] = 0.15  # placeholder: 15% as fraction (0–1)
     edges["tree_count"] = 0
     edges["grade_range_smooth"] = 0.0
     edges["grade_smooth_p90"] = 0.0
@@ -494,6 +495,34 @@ def run_pipeline():
     
     edges_export = edges_4326[keep_cols].copy()
     bg_export = bg_4326[["GEOID", "population", "median_income", "geometry"]].copy()
+
+    # Pre-compute GeoJSON strings so the browser never needs the DuckDB spatial extension.
+    print("Computing GeoJSON strings and centroids...")
+    edges_export = edges_export.copy()
+    edges_export["geojson"] = edges_export.geometry.apply(
+        lambda g: json.dumps(g.__geo_interface__)
+    )
+    centroids = edges_export.geometry.centroid
+    edges_export["centroid_lat"] = centroids.y
+    edges_export["centroid_lon"] = centroids.x
+
+    bg_export = bg_export.copy()
+    bg_export["geojson"] = bg_export.geometry.apply(
+        lambda g: json.dumps(g.__geo_interface__)
+    )
+
+    # Save Trenton outer boundary as a static JSON file (replaces ST_CoverageUnion_Agg query).
+    print("Computing Trenton city boundary...")
+    dissolved = bg_4326.dissolve()
+    boundary_geom = dissolved.geometry.iloc[0].boundary
+    boundary_fc = {
+        "type": "FeatureCollection",
+        "features": [{"type": "Feature", "properties": {"name": "Trenton"},
+                      "geometry": boundary_geom.__geo_interface__}]
+    }
+    with open("app/public/data/trenton_boundary.json", "w") as f:
+        json.dump(boundary_fc, f)
+    print("Saved trenton_boundary.json")
     
     print("Writing Trenton GeoParquet files...")
     edges_export.to_parquet("app/public/data/trenton_segments.parquet", compression="zstd")

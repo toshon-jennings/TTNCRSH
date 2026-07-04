@@ -30,7 +30,7 @@ const SEGMENT_COLUMN_DEFAULTS = [
 export async function initDB(): Promise<duckdb.AsyncDuckDB> {
   if (_db) return _db;
 
-  const DB_VERSION = 'v7_overlays';
+  const DB_VERSION = 'v8_no_spatial';
   const versionKey = 'db_version';
   const currentVersion = localStorage.getItem(versionKey);
   if (currentVersion !== DB_VERSION) {
@@ -68,7 +68,6 @@ export async function initDB(): Promise<duckdb.AsyncDuckDB> {
 
   const conn = await db.connect();
   try {
-    await conn.query('INSTALL spatial; LOAD spatial;');
     await createSegmentsView(conn);
     await conn.query(`CREATE OR REPLACE VIEW block_groups AS SELECT * FROM read_parquet('${BG_FILE_NAME}')`);
     await conn.query(`CREATE OR REPLACE VIEW neighborhoods AS SELECT * FROM read_parquet('${NEIGHBORHOODS_FILE_NAME}')`);

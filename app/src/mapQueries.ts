@@ -1,5 +1,7 @@
 import { query } from './db';
 
+export const BOUNDARY_URL = '/TTNCRSH/data/trenton_boundary.json';
+
 export type SegmentProperties = {
   seg_id: number;
   crash_count: number | null;
@@ -132,7 +134,7 @@ export async function loadSegmentFeatures(): Promise<SegmentFeature[]> {
     CAST(roadway_defect_count AS INTEGER) AS roadway_defect_count,
     CAST(roadway_paving_request_count AS INTEGER) AS roadway_paving_request_count,
     CAST(roadway_open_request_count AS INTEGER) AS roadway_open_request_count,
-    ST_AsGeoJSON(geometry)              AS geojson
+    geojson
   FROM segments
 `);
 
@@ -185,7 +187,7 @@ export async function loadBlockGroupFeatures(): Promise<BlockGroupFeature[]> {
       GEOID,
       CAST(population AS INTEGER) AS population,
       CASE WHEN median_income < 0 THEN NULL ELSE CAST(median_income AS INTEGER) END AS median_income,
-      ST_AsGeoJSON(geometry) AS geojson
+      geojson
     FROM block_groups
   `);
 
@@ -201,22 +203,9 @@ export async function loadBlockGroupFeatures(): Promise<BlockGroupFeature[]> {
 }
 
 export async function loadTrentonBoundary(): Promise<BoundaryFeatureCollection> {
-  const result = await query(`
-    SELECT ST_AsGeoJSON(ST_Boundary(ST_CoverageUnion_Agg(geometry))) AS geojson
-    FROM block_groups
-  `);
-  const row = result.toArray()[0] as any;
-
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: { name: 'Trenton' },
-        geometry: JSON.parse(row.geojson),
-      },
-    ],
-  };
+  const res = await fetch(BOUNDARY_URL);
+  if (!res.ok) throw new Error(`Failed to load boundary: ${res.status}`);
+  return res.json();
 }
 
 export async function loadBlockGroupPeerComparison(p: SegmentProperties): Promise<PeerComparison | null> {
@@ -333,7 +322,7 @@ export async function loadStoryFocalExamples(storyId: string): Promise<StoryFoca
     CAST(roadway_defect_count AS INTEGER) AS roadway_defect_count,
     CAST(roadway_paving_request_count AS INTEGER) AS roadway_paving_request_count,
     CAST(roadway_open_request_count AS INTEGER) AS roadway_open_request_count,
-    ST_AsGeoJSON(geometry)              AS geojson
+    geojson
   `;
 
   const queries: Record<string, string> = {
@@ -481,7 +470,8 @@ export async function loadVisibleLeaderboard(
            THEN (CAST(${colName} AS FLOAT) * 1000.0) / CAST(length AS FLOAT)
            ELSE 0.0 END                   AS crash_density
     FROM segments
-    WHERE ST_Intersects(geometry, ST_MakeEnvelope(${west}, ${south}, ${east}, ${north}))
+    WHERE centroid_lat BETWEEN ${south} AND ${north}
+      AND centroid_lon BETWEEN ${west} AND ${east}
       AND ${colName} > 0
       AND length >= ${LEADERBOARD_MIN_LENGTH_FT}
     ORDER BY crash_density DESC
