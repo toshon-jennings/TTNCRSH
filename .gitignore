@@ -1,0 +1,13 @@
+raw-data*
+transformed-data*
+.DS_Store
+.env
+__pycache__
+cachescratchpad.ipynb
+.venv/
+venv/
+node_modules/
+.vscode/
+dist/
+scratch/
+cache/

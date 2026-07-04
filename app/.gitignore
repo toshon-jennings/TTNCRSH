@@ -1,0 +1,7 @@
+node_modules/
+dist/
+public/data/*
+!public/data/
+!public/data/trenton_block_groups.parquet
+!public/data/trenton_neighborhoods.parquet
+!public/data/trenton_segments.parquet

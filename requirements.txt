@@ -1,0 +1,38 @@
+# PHLCRSH analysis/notebook environment
+# Recommended: Python 3.10-3.12. The geospatial stack may lag new Python releases.
+
+# Notebook/runtime
+jupyterlab>=4.0
+ipykernel>=6.0
+requests>=2.31
+python-dotenv>=1.0
+
+# Data frames, geometry, and parquet/geopackage I/O
+numpy>=1.26
+pandas>=2.2
+geopandas>=0.14
+shapely>=2.0
+pyarrow>=14.0
+pyogrio>=0.7
+duckdb>=0.10
+
+# Raster, elevation, canopy, and OSM workflows
+rasterio>=1.3
+rasterstats>=0.19
+osmnx>=1.9
+
+# Census / ACS inputs
+census>=0.8
+pygris>=0.1
+
+# Analysis and visualization
+scipy>=1.11
+statsmodels>=0.14
+matplotlib>=3.8
+seaborn>=0.13
+plotly>=5.18
+folium>=0.15
+cmocean>=4.0
+
+# Optional R2/S3 upload helper
+boto3>=1.34
