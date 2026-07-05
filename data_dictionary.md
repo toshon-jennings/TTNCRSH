@@ -16,8 +16,8 @@ This table represents individual street centerline segments in Trenton, NJ, enri
 | **`length`** | `FLOAT` | Computed | Geometry length of the street segment in feet (calculated in EPSG:3424). |
 | **`cartway_width_ft`** | `FLOAT` | Class Default | Estimated width of the roadway cartway (curb-to-curb) in feet, defaulted based on functional classification. |
 | **`maxspeed_final`** | `FLOAT` | OpenStreetMap / Defaults | Final posted speed limit in miles per hour (MPH). |
-| **`canopy_pct`** | `FLOAT` | Default | Percentage of tree canopy cover intersecting the segment buffer area (defaults to 15.0%). |
-| **`grade_range_smooth`** | `FLOAT` | Default | Smoothed segment slope grade (defaults to 0.0). |
+| **`canopy_pct`** | `FLOAT` | NLCD 2021 Tree Canopy Cover / null | Percentage of tree canopy cover sampled along the segment corridor. Null when canopy rasters are unavailable. |
+| **`grade_range_smooth`** | `FLOAT` | USGS 3DEP DEM / null | Smoothed segment slope grade sampled from elevation. Null when elevation rasters are unavailable. |
 | **`GEOID`** | `VARCHAR` | Census Bureau | FIPS census block group identifier containing the segment midpoint. |
 | **`geometry`** | `GEOMETRY` | OpenStreetMap | LineString geometry of the centerline segment (EPSG:4326). |
 

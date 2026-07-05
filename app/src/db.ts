@@ -30,7 +30,7 @@ const SEGMENT_COLUMN_DEFAULTS = [
 export async function initDB(): Promise<duckdb.AsyncDuckDB> {
   if (_db) return _db;
 
-  const DB_VERSION = 'v8_no_spatial';
+  const DB_VERSION = 'v9_no_placeholders';
   const versionKey = 'db_version';
   const currentVersion = localStorage.getItem(versionKey);
   if (currentVersion !== DB_VERSION) {

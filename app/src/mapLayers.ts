@@ -46,12 +46,14 @@ export const LEGENDS: Record<string, Legend> = {
     { color: '#a50f15', label: '50+' },
   ]},
   'canopy-pct': { kind: 'steps', stops: [
+    { color: '#d1d5db', label: 'No data' },
     { color: '#ffffff', label: '0%' },
     { color: '#e5f5e0', label: '5%' },
     { color: '#a1d99b', label: '10%' },
     { color: '#31a354', label: '50%+' },
   ]},
   'grade': { kind: 'steps', stops: [
+    { color: '#d1d5db', label: 'No data' },
     { color: '#f7f4f9', label: '0%' },
     { color: '#d4b9da', label: '0.5%' },
     { color: '#d281b3', label: '2%' },
@@ -223,11 +225,14 @@ export function addMapSourcesAndLayers(
     source: 'segments',
     paint: {
       'line-color': [
-        'step', ['coalesce', ['get', 'canopy_pct'], 0],
-        '#fff',
-        0.05, '#e5f5e0',
-        0.1, '#a1d99b',
-        0.5, '#31a354',
+        'case',
+        ['==', ['get', 'canopy_pct'], null as any], '#d1d5db',
+        ['step', ['get', 'canopy_pct'],
+          '#fff',
+          0.05, '#e5f5e0',
+          0.1, '#a1d99b',
+          0.5, '#31a354',
+        ],
       ],
       'line-width': [
         'step', ['coalesce', ['get', 'cartway_width_ft'], 0],
@@ -246,12 +251,15 @@ export function addMapSourcesAndLayers(
     source: 'segments',
     paint: {
       'line-color': [
-        'step', ['coalesce', ['get', 'grade_range_smooth'], 0],
-        '#f7f4f9',
-        0.005, '#d4b9da',
-        0.020, '#d281b3',
-        0.060, '#cf27f1',
-        0.100, '#ff0000',
+        'case',
+        ['==', ['get', 'grade_range_smooth'], null as any], '#d1d5db',
+        ['step', ['get', 'grade_range_smooth'],
+          '#f7f4f9',
+          0.005, '#d4b9da',
+          0.020, '#d281b3',
+          0.060, '#cf27f1',
+          0.100, '#ff0000',
+        ],
       ],
       'line-width': [
         'step', ['coalesce', ['get', 'cartway_width_ft'], 0],
@@ -268,7 +276,7 @@ export function addMapSourcesAndLayers(
     id: 'grade-outliers',
     type: 'line',
     source: 'segments',
-    filter: ['>', ['coalesce', ['get', 'grade_range_smooth'], 0], GRADE_OUTLIER_THRESHOLD],
+    filter: ['all', ['!=', ['get', 'grade_range_smooth'], null as any], ['>', ['get', 'grade_range_smooth'], GRADE_OUTLIER_THRESHOLD]],
     layout: { visibility: 'none' },
     paint: {
       'line-color': '#ffe500',
@@ -304,7 +312,7 @@ export function addMapSourcesAndLayers(
     id: 'grade-outlier-markers',
     type: 'symbol',
     source: 'segments',
-    filter: ['>', ['coalesce', ['get', 'grade_range_smooth'], 0], GRADE_OUTLIER_THRESHOLD],
+    filter: ['all', ['!=', ['get', 'grade_range_smooth'], null as any], ['>', ['get', 'grade_range_smooth'], GRADE_OUTLIER_THRESHOLD]],
     layout: {
       visibility: 'none',
       'symbol-placement': 'line-center',
@@ -323,10 +331,11 @@ export function addMapSourcesAndLayers(
     paint: {
       'line-color': [
         'case',
-        ['all', ['<', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['<', ['coalesce', ['get', 'canopy_pct'], 0], 0.1]], '#d5d8d2',
-        ['all', ['<', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['>=', ['coalesce', ['get', 'canopy_pct'], 0], 0.1]], '#9bd880',
-        ['all', ['>=', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['<', ['coalesce', ['get', 'canopy_pct'], 0], 0.1]], '#f59e7d',
-        ['all', ['>=', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['>=', ['coalesce', ['get', 'canopy_pct'], 0], 0.1]], '#137a4a',
+        ['==', ['get', 'canopy_pct'], null as any], '#d1d5db',
+        ['all', ['<', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['<', ['get', 'canopy_pct'], 0.1]], '#d5d8d2',
+        ['all', ['<', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['>=', ['get', 'canopy_pct'], 0.1]], '#9bd880',
+        ['all', ['>=', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['<', ['get', 'canopy_pct'], 0.1]], '#f59e7d',
+        ['all', ['>=', ['coalesce', ['get', 'cartway_width_ft'], 0], 35], ['>=', ['get', 'canopy_pct'], 0.1]], '#137a4a',
         '#d5d8d2',
       ],
       'line-width': [
@@ -344,10 +353,11 @@ export function addMapSourcesAndLayers(
     paint: {
       'line-color': [
         'case',
-        ['all', ['<', ['coalesce', ['get', 'grade_range_smooth'], 0], 0.02], ['<', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#d7d9dc',
-        ['all', ['>=', ['coalesce', ['get', 'grade_range_smooth'], 0], 0.02], ['<', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#f2c66d',
-        ['all', ['<', ['coalesce', ['get', 'grade_range_smooth'], 0], 0.02], ['>=', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#f29a76',
-        ['all', ['>=', ['coalesce', ['get', 'grade_range_smooth'], 0], 0.02], ['>=', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#b91c1c',
+        ['==', ['get', 'grade_range_smooth'], null as any], '#d1d5db',
+        ['all', ['<', ['get', 'grade_range_smooth'], 0.02], ['<', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#d7d9dc',
+        ['all', ['>=', ['get', 'grade_range_smooth'], 0.02], ['<', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#f2c66d',
+        ['all', ['<', ['get', 'grade_range_smooth'], 0.02], ['>=', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#f29a76',
+        ['all', ['>=', ['get', 'grade_range_smooth'], 0.02], ['>=', ['coalesce', ['get', 'maxspeed_final'], 0], 35]], '#b91c1c',
         '#d7d9dc',
       ],
       'line-width': [
@@ -518,8 +528,9 @@ export function setGradeOutlierVisibility(map: maplibregl.Map, visible: boolean)
 }
 
 export function setGradeOutlierThreshold(map: maplibregl.Map, threshold: number) {
-  map.setFilter('grade-outliers', ['>', ['coalesce', ['get', 'grade_range_smooth'], 0], threshold]);
-  map.setFilter('grade-outlier-markers', ['>', ['coalesce', ['get', 'grade_range_smooth'], 0], threshold]);
+  const filter = ['all', ['!=', ['get', 'grade_range_smooth'], null as any], ['>', ['get', 'grade_range_smooth'], threshold]];
+  map.setFilter('grade-outliers', filter as any);
+  map.setFilter('grade-outlier-markers', filter as any);
 }
 
 export function clearGradeOutliers(map: maplibregl.Map) {

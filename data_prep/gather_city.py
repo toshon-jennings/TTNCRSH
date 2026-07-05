@@ -10,11 +10,148 @@ import pandas as pd
 import numpy as np
 import pygris
 from shapely.geometry import Point, Polygon
+from pyproj import Transformer
+import rasterio
+from rasterio.io import MemoryFile
+from rasterio.transform import rowcol
 
 # User-Agent header to bypass state WAF
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
+
+CANOPY_ZIP_URL = "https://data.fs.usda.gov/geodata/rastergateway/treecanopycover/docs/v2025-6/nlcd_tcc_conus_2021_v2025-6_wgs84.zip"
+CANOPY_TIF_NAME = "nlcd_tcc_conus_wgs84_v2025-6_20210101_20211231.tif"
+DEM_EXPORT_URL = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage"
+
+
+def _sample_line_values(line, source_crs, array, affine, raster_crs, sample_count=9, nodata=None):
+    if line.is_empty or line.length <= 0:
+        return []
+
+    transformer = Transformer.from_crs(source_crs, raster_crs, always_xy=True)
+    distances = np.linspace(0.0, line.length, num=max(sample_count, 2))
+    values = []
+
+    for distance in distances:
+        point = line.interpolate(distance)
+        x, y = transformer.transform(point.x, point.y)
+        row, col = rowcol(affine, x, y)
+        if row < 0 or col < 0 or row >= array.shape[0] or col >= array.shape[1]:
+            continue
+        value = array[row, col]
+        if nodata is not None and value == nodata:
+            continue
+        if np.isnan(value):
+            continue
+        values.append(float(value))
+
+    return values
+
+
+def _load_canopy_window(boundary):
+    canopy_bounds = boundary.to_crs(5070).total_bounds
+    pad_m = 1500.0
+    path = f"/vsizip/vsicurl/{CANOPY_ZIP_URL}/{CANOPY_TIF_NAME}"
+
+    with rasterio.open(path) as src:
+        window = rasterio.windows.from_bounds(
+            canopy_bounds[0] - pad_m,
+            canopy_bounds[1] - pad_m,
+            canopy_bounds[2] + pad_m,
+            canopy_bounds[3] + pad_m,
+            transform=src.transform,
+        ).round_offsets().round_lengths()
+        data = src.read(1, window=window, boundless=True, fill_value=255)
+        affine = src.window_transform(window)
+        return data, affine, src.nodata
+
+
+def _load_dem_window(boundary):
+    bounds = boundary.to_crs(4326).total_bounds
+    pad_deg = 0.01
+    params = {
+        "bbox": f"{bounds[0] - pad_deg},{bounds[1] - pad_deg},{bounds[2] + pad_deg},{bounds[3] + pad_deg}",
+        "bboxSR": 4326,
+        "size": "2048,2048",
+        "imageSR": 4326,
+        "format": "tiff",
+        "pixelType": "F32",
+        "f": "image",
+    }
+    res = requests.get(DEM_EXPORT_URL, params=params, timeout=120)
+    if not res.ok:
+        raise RuntimeError(f"Failed to download DEM clip: {res.status_code}")
+
+    with MemoryFile(res.content) as memfile:
+        with memfile.open() as src:
+            return src.read(1), src.transform, src.nodata
+
+
+def compute_canopy_metrics(segments: gpd.GeoDataFrame, boundary: gpd.GeoDataFrame) -> pd.DataFrame:
+    canopy_data, canopy_affine, canopy_nodata = _load_canopy_window(boundary)
+    records = []
+    for row in segments[["seg_id", "geometry"]].itertuples(index=False):
+        values = _sample_line_values(row.geometry, 3424, canopy_data, canopy_affine, 5070, sample_count=11, nodata=canopy_nodata)
+        canopy_pct = float(np.mean(values) / 100.0) if values else np.nan
+        records.append({
+            "seg_id": row.seg_id,
+            "canopy_pct": canopy_pct,
+            "tree_count": np.nan,
+        })
+    return pd.DataFrame(records)
+
+
+def compute_grade_metrics(segments: gpd.GeoDataFrame, boundary: gpd.GeoDataFrame) -> pd.DataFrame:
+    dem_data, dem_affine, dem_nodata = _load_dem_window(boundary)
+    transformer = Transformer.from_crs(3424, 4326, always_xy=True)
+    records = []
+    for row in segments[["seg_id", "geometry"]].itertuples(index=False):
+        geom = row.geometry
+        if geom.is_empty or geom.length <= 0:
+            records.append({
+                "seg_id": row.seg_id,
+                "grade_range_smooth": np.nan,
+                "grade_smooth_p90": np.nan,
+            })
+            continue
+        distances_m = np.linspace(0.0, geom.length * 0.3048, num=11)
+        values = []
+        values = []
+        for distance_m, distance_ft in zip(distances_m, np.linspace(0.0, geom.length, num=11)):
+            point = geom.interpolate(distance_ft)
+            x, y = transformer.transform(point.x, point.y)
+            row_idx, col_idx = rowcol(dem_affine, x, y)
+            if row_idx < 0 or col_idx < 0 or row_idx >= dem_data.shape[0] or col_idx >= dem_data.shape[1]:
+                continue
+            value = dem_data[row_idx, col_idx]
+            if dem_nodata is not None and value == dem_nodata:
+                continue
+            if np.isnan(value):
+                continue
+            values.append((distance_m, float(value)))
+
+        if len(values) < 2:
+            records.append({
+                "seg_id": row.seg_id,
+                "grade_range_smooth": np.nan,
+                "grade_smooth_p90": np.nan,
+            })
+            continue
+
+        d = np.array([item[0] for item in values], dtype=float)
+        z = np.array([item[1] for item in values], dtype=float)
+        local_slopes = np.abs(np.diff(z) / np.diff(d)) if len(values) > 2 else np.array([abs((z[-1] - z[0]) / (d[-1] - d[0]))])
+        slope = abs(np.polyfit(d, z, 1)[0]) if len(values) > 1 else np.nan
+        p90 = float(np.percentile(local_slopes, 90)) if len(local_slopes) else np.nan
+
+        records.append({
+            "seg_id": row.seg_id,
+            "grade_range_smooth": float(slope) if not np.isnan(slope) else np.nan,
+            "grade_smooth_p90": p90,
+        })
+
+    return pd.DataFrame(records)
 
 def download_nj_crashes(year, dest_dir="scratch"):
     os.makedirs(dest_dir, exist_ok=True)
@@ -396,10 +533,12 @@ def run_pipeline():
     edges["has_aadt"] = 0
     edges["state_aadt"] = None
     edges["adt_source"] = "None"
-    edges["canopy_pct"] = 0.15  # placeholder: 15% as fraction (0–1)
-    edges["tree_count"] = 0
-    edges["grade_range_smooth"] = 0.0
-    edges["grade_smooth_p90"] = 0.0
+    # Canopy and grade are only trustworthy when the raster inputs are present.
+    # Leave them null rather than fabricating citywide constants.
+    edges["canopy_pct"] = np.nan
+    edges["tree_count"] = np.nan
+    edges["grade_range_smooth"] = np.nan
+    edges["grade_smooth_p90"] = np.nan
     edges["state_lane_cnt"] = None
     edges["state_total_width_ft"] = None
     edges["state_divisor_type"] = None
@@ -407,6 +546,18 @@ def run_pipeline():
     edges["adt"] = None
     edges["vmt"] = None
     edges["risk_index"] = 0.0 # Will be recalculated in browser view or python
+
+    print("Sampling canopy and elevation rasters...")
+    canopy_metrics = compute_canopy_metrics(edges_3424, boundary)
+    grade_metrics = compute_grade_metrics(edges_3424, boundary)
+    raster_metrics = canopy_metrics.merge(grade_metrics, on="seg_id", how="outer")
+    edges = edges.merge(raster_metrics, on="seg_id", how="left", suffixes=("", "_raster"))
+    for col in ["canopy_pct", "tree_count", "grade_range_smooth", "grade_smooth_p90"]:
+        raster_col = f"{col}_raster"
+        if raster_col in edges.columns:
+            edges[col] = edges[raster_col].combine_first(edges[col])
+            edges = edges.drop(columns=[raster_col])
+
     # Bike infrastructure: classify from OSM cycleway tags
     def classify_bike_infra(row):
         for tag in ("cycleway", "cycleway:both", "cycleway:left", "cycleway:right"):
