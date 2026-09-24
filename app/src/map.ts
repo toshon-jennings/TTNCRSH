@@ -1,4 +1,5 @@
 import maplibregl from 'maplibre-gl';
+import DOMPurify from 'dompurify';
 import {
   activateChip,
   findChip,
@@ -25,6 +26,12 @@ import {
   setGradeOutlierVisibility,
   type LayerGroup,
 } from './mapLayers';
+
+function escapeHTML(text: unknown): string {
+  return String(text).replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!)
+  );
+}
 
 function segmentPopupHTML(p: Partial<SegmentProperties>) {
   const row = (label: string, value: string) =>
@@ -641,7 +648,7 @@ export async function initMap(container: string) {
       rows.push(['Divider', p.state_divisor_type, '']);
     }
 
-    content.innerHTML = `
+    content.innerHTML = DOMPurify.sanitize(`
       <div class="pinned-street">
         <div class="pinned-street-name">${streetName}</div>
       </div>
@@ -654,7 +661,7 @@ export async function initMap(container: string) {
       ).join('')}
       <div class="peer-comparison" id="peer-comparison">
         <h4>Loading block-group context…</h4>
-      </div>`;
+      </div>`);
 
     content.querySelector<HTMLButtonElement>('#mobile-pinned-details')?.addEventListener('click', () => {
       setMobileSheetState('full');
@@ -679,7 +686,7 @@ export async function initMap(container: string) {
         ? `${(comparison.bgMedianCanopy * 100).toFixed(0)}%`
         : '—';
 
-      peerEl.innerHTML = `
+      peerEl.innerHTML = DOMPurify.sanitize(`
         <h4>Block group (${comparison.peerN} segments)</h4>
         <div class="stat-row">
           <span>Crashes — block-group median</span>
@@ -692,7 +699,7 @@ export async function initMap(container: string) {
         <details class="sql-details">
           <summary>View DuckDB query</summary>
           <pre>${comparison.sql}</pre>
-        </details>`;
+        </details>`);
     } catch (err) {
       peerEl.innerHTML = '<h4>Query failed.</h4>';
       console.error(err);
@@ -746,11 +753,11 @@ export async function initMap(container: string) {
         return `
           <div class="leaderboard-item" data-seg-id="${entry.seg_id}" style="padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: background 0.12s;">
             <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
-              <span style="font-size: 11.5px; font-weight: 600; color: var(--color-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${name}</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: var(--color-text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${escapeHTML(name)}</span>
               <span style="font-size: 11px; font-weight: bold; color: var(--color-warn); white-space: nowrap;">${entry.crash_density.toFixed(1)}</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 9.5px; color: var(--color-secondary); gap: 8px;">
-              <span style="text-transform: capitalize;">${entry.road_class || 'Local'}</span>
+              <span style="text-transform: capitalize;">${escapeHTML(entry.road_class || 'Local')}</span>
               <span style="white-space: nowrap;">${entry.crash_count} crashes / ${entry.length.toFixed(0)} ft</span>
             </div>
           </div>

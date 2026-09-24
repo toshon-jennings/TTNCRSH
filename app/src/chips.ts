@@ -1,4 +1,5 @@
 import type maplibregl from 'maplibre-gl';
+import DOMPurify from 'dompurify';
 import { GRADE_OUTLIER_THRESHOLD, setGradeOutlierThreshold } from './mapLayers';
 import { countGradeOutliers, loadStoryFocalExamples, type StoryFocalExample } from './mapQueries';
 
@@ -79,7 +80,7 @@ export function renderStoryContent(chip: StoryChip, map: maplibregl.Map, onFocus
              min="5" max="30" value="15" step="1">
       <div class="outlier-count" id="outlier-count">Counting…</div>
     </div>` : '';
-  el.innerHTML = `
+  el.innerHTML = DOMPurify.sanitize(`
     <div class="story-label">Finding</div>
     <div class="story-title">${chip.title}</div>
     <div class="story-stat">${chip.stat}</div>
@@ -87,7 +88,7 @@ export function renderStoryContent(chip: StoryChip, map: maplibregl.Map, onFocus
     <div class="story-focal-examples" id="story-focal-examples">
       <div class="story-focal-loading">Finding live examples…</div>
     </div>
-    ${sliderHtml}`;
+    ${sliderHtml}`);
 
   if (chip.extras === 'grade-outlier-slider') {
     const checkbox = document.getElementById('toggle-grade-outliers') as HTMLInputElement | null;
@@ -103,11 +104,11 @@ export function renderStoryContent(chip: StoryChip, map: maplibregl.Map, onFocus
 
 export function renderChipList(onActivate: (chip: StoryChip) => void) {
   const listEl = document.getElementById('chip-list')!;
-  listEl.innerHTML = CHIPS.map((chip) => `
+  listEl.innerHTML = CHIPS.map((chip) => DOMPurify.sanitize(`
     <button class="chip" data-chip-id="${chip.id}">
       <div class="chip-title">${chip.title}</div>
       <div class="chip-hook">${chip.hook}</div>
-    </button>`).join('');
+    </button>`)).join('');
   listEl.querySelectorAll<HTMLButtonElement>('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {
       const chip = findChip(btn.dataset.chipId ?? null);

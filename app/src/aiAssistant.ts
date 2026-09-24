@@ -805,7 +805,7 @@ export function initAIAssistant() {
   const appendMessage = (msg: Message): HTMLDivElement => {
     const msgDiv = document.createElement('div');
     msgDiv.className = `ai-message ${msg.role}-message`;
-    msgDiv.innerHTML = renderMessageBody(msg) + renderMessageExtras(msg);
+    msgDiv.innerHTML = DOMPurify.sanitize(renderMessageBody(msg) + renderMessageExtras(msg));
     messagesContainer.appendChild(msgDiv);
     attachMessageListeners(msgDiv);
     scrollToBottom();
@@ -827,7 +827,7 @@ export function initAIAssistant() {
       },
       finish: (msg: Message) => {
         const pinned = isNearBottom();
-        msgDiv.innerHTML = renderMessageBody(msg) + renderMessageExtras(msg);
+        msgDiv.innerHTML = DOMPurify.sanitize(renderMessageBody(msg) + renderMessageExtras(msg));
         attachMessageListeners(msgDiv);
         if (pinned) scrollToBottom();
       },
